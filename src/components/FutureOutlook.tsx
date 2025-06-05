@@ -1,8 +1,8 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, useMotionValue, useTransform, useSpring, AnimatePresence } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Bar, PieChart, Pie, Cell } from 'recharts'
 import { Rocket, Target, AlertCircle, TrendingUp, Building, Globe2, DollarSign, Users, Zap, Shield } from 'lucide-react'
 
@@ -101,26 +101,138 @@ const expansionPlans = [
   }
 ]
 
+function AnimatedCounter({ end, duration = 2, suffix = '' }: { end: number, duration?: number, suffix?: string }) {
+  const [count, setCount] = useState(0)
+  const [isVisible, setIsVisible] = useState(false)
+  const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.5 })
+
+  useEffect(() => {
+    if (inView && !isVisible) {
+      setIsVisible(true)
+      const startTime = Date.now()
+      const endTime = startTime + duration * 1000
+
+      const updateCount = () => {
+        const now = Date.now()
+        const progress = Math.min((now - startTime) / (endTime - startTime), 1)
+        setCount(Math.floor(progress * end))
+
+        if (progress < 1) {
+          requestAnimationFrame(updateCount)
+        }
+      }
+
+      requestAnimationFrame(updateCount)
+    }
+  }, [inView, end, duration, isVisible])
+
+  return <span ref={ref}>{count}{suffix}</span>
+}
+
+function FloatingElement({ delay, children }: { delay: number, children: React.ReactNode }) {
+  return (
+    <motion.div
+      className="absolute"
+      initial={{ 
+        x: Math.random() * 100,
+        y: Math.random() * 100,
+        opacity: 0.3
+      }}
+      animate={{
+        x: Math.random() * 100,
+        y: Math.random() * 100,
+        opacity: [0.3, 0.8, 0.3],
+        scale: [1, 1.2, 1],
+      }}
+      transition={{
+        duration: 6 + Math.random() * 4,
+        repeat: Infinity,
+        delay: delay,
+        ease: "easeInOut"
+      }}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
 export default function FutureOutlook() {
   const [activeRisk, setActiveRisk] = useState(0)
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  
   const [ref, inView] = useInView({
     triggerOnce: true,
     threshold: 0.1,
   })
+
+  const [chartRef, chartInView] = useInView({
+    triggerOnce: true,
+    threshold: 0.3,
+  })
+
+  // Mouse tracking for 3D effects
+  const mouseX = useMotionValue(0)
+  const mouseY = useMotionValue(0)
+  
+  const rotateX = useTransform(mouseY, [-300, 300], [2, -2])
+  const rotateY = useTransform(mouseX, [-300, 300], [-2, 2])
+  
+  const springConfig = { damping: 25, stiffness: 400 }
+  const x = useSpring(rotateX, springConfig)
+  const y = useSpring(rotateY, springConfig)
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const { clientX, clientY } = e
+      const { innerWidth, innerHeight } = window
+      const x = clientX - innerWidth / 2
+      const y = clientY - innerHeight / 2
+      
+      setMousePosition({ x, y })
+      mouseX.set(x)
+      mouseY.set(y)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [mouseX, mouseY])
 
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.2,
+        staggerChildren: 0.15,
       },
     },
   }
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 50 },
-    visible: { opacity: 1, y: 0 },
+    hidden: { opacity: 0, y: 50, rotateX: -10 },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      rotateX: 0,
+      transition: {
+        type: "spring",
+        stiffness: 100,
+        damping: 12
+      }
+    },
+  }
+
+  const cardHover = {
+    rest: { scale: 1, rotateY: 0, z: 0 },
+    hover: { 
+      scale: 1.05, 
+      rotateY: 5, 
+      z: 50,
+      transition: {
+        type: "spring",
+        stiffness: 300,
+        damping: 20
+      }
+    }
   }
 
   const riskColors = {
@@ -137,59 +249,191 @@ export default function FutureOutlook() {
     'evaluation': 'bg-orange-100 text-orange-800'
   }
 
+  const floatingElements = Array.from({ length: 8 }, (_, i) => i)
+
   return (
-    <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
-      <div className="max-w-7xl mx-auto px-4">
+    <section className="py-20 bg-gradient-to-b from-gray-50 to-white relative overflow-hidden">
+      {/* Floating Background Elements */}
+      <div className="absolute inset-0 pointer-events-none">
+        {floatingElements.map((element) => (
+          <FloatingElement key={element} delay={element * 0.8}>
+            <div className="w-3 h-3 bg-gradient-to-r from-blue-400/20 to-purple-400/20 rounded-full" />
+          </FloatingElement>
+        ))}
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 relative z-10">
         <motion.div
           ref={ref}
           variants={containerVariants}
           initial="hidden"
           animate={inView ? "visible" : "hidden"}
+          style={{
+            rotateX: x,
+            rotateY: y,
+            transformStyle: "preserve-3d"
+          }}
         >
-          {/* Section Header */}
+          {/* Enhanced Section Header */}
           <motion.div variants={itemVariants} className="text-center mb-16">
-            <h2 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+            <motion.h2 
+              className="text-4xl md:text-6xl font-bold text-gray-900 mb-6"
+              whileHover={{ 
+                scale: 1.05,
+                background: "linear-gradient(45deg, #3B82F6, #8B5CF6, #10B981, #F59E0B)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent"
+              }}
+              transition={{ type: "spring", stiffness: 300 }}
+            >
               미래 전망 및 도전 과제
-            </h2>
-            <div className="w-24 h-1 bg-gradient-to-r from-blue-600 to-purple-600 mx-auto mb-8"></div>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+            </motion.h2>
+            <motion.div 
+              className="w-24 h-1 bg-gradient-to-r from-blue-600 to-purple-600 mx-auto mb-8"
+              initial={{ width: 0 }}
+              animate={inView ? { width: 96 } : { width: 0 }}
+              transition={{ duration: 1, delay: 0.5 }}
+            />
+            <motion.p 
+              className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed"
+              initial={{ opacity: 0, y: 20 }}
+              animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+              transition={{ delay: 0.8, duration: 0.8 }}
+            >
               론자 그룹의 중장기 성장 전략과 예상되는 도전 과제를 종합적으로 분석합니다.
-            </p>
+            </motion.p>
           </motion.div>
 
-          {/* Growth Targets */}
+          {/* Enhanced Growth Targets */}
           <motion.div variants={itemVariants} className="mb-20">
-            <h3 className="text-3xl font-bold text-gray-900 mb-8 text-center">중기 성장 목표</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-200 text-center">
-                <TrendingUp className="w-10 h-10 text-blue-600 mx-auto mb-3" />
-                <h4 className="text-2xl font-bold text-blue-900">11-13%</h4>
-                <p className="text-blue-700 text-sm">연평균 매출 성장률</p>
-                <p className="text-xs text-blue-600 mt-1">(2024-2028)</p>
-              </div>
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-xl border border-purple-200 text-center">
-                <DollarSign className="w-10 h-10 text-purple-600 mx-auto mb-3" />
-                <h4 className="text-2xl font-bold text-purple-900">32-34%</h4>
-                <p className="text-purple-700 text-sm">CORE EBITDA 마진</p>
-                <p className="text-xs text-purple-600 mt-1">목표 유지</p>
-              </div>
-              <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-xl border border-green-200 text-center">
-                <Building className="w-10 h-10 text-green-600 mx-auto mb-3" />
-                <h4 className="text-2xl font-bold text-green-900">50억+</h4>
-                <p className="text-green-700 text-sm">CHF 총 투자규모</p>
-                <p className="text-xs text-green-600 mt-1">(2024-2026)</p>
-              </div>
-              <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-6 rounded-xl border border-orange-200 text-center">
-                <Users className="w-10 h-10 text-orange-600 mx-auto mb-3" />
-                <h4 className="text-2xl font-bold text-orange-900">20,000+</h4>
-                <p className="text-orange-700 text-sm">목표 임직원 수</p>
-                <p className="text-xs text-orange-600 mt-1">(2028년)</p>
-              </div>
-            </div>
+            <motion.h3 
+              className="text-3xl font-bold text-gray-900 mb-8 text-center"
+              whileHover={{ scale: 1.05 }}
+            >
+              중기 성장 목표
+            </motion.h3>
+            
+            <motion.div 
+              className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12"
+              variants={containerVariants}
+            >
+              {[
+                { 
+                  icon: TrendingUp, 
+                  value: "11-13%", 
+                  label: "연평균 매출 성장률", 
+                  detail: "(2024-2028)", 
+                  color: "blue",
+                  animatedValue: 12
+                },
+                { 
+                  icon: DollarSign, 
+                  value: "32-34%", 
+                  label: "CORE EBITDA 마진", 
+                  detail: "목표 유지", 
+                  color: "purple",
+                  animatedValue: 33
+                },
+                { 
+                  icon: Building, 
+                  value: "50억+", 
+                  label: "CHF 총 투자규모", 
+                  detail: "(2024-2026)", 
+                  color: "green",
+                  animatedValue: 50
+                },
+                { 
+                  icon: Users, 
+                  value: "20,000+", 
+                  label: "목표 임직원 수", 
+                  detail: "(2028년)", 
+                  color: "orange",
+                  animatedValue: 20000
+                }
+              ].map((item, index) => (
+                <motion.div
+                  key={index}
+                  className={`bg-gradient-to-br from-${item.color}-50 to-${item.color}-100 p-6 rounded-xl border border-${item.color}-200 text-center cursor-pointer relative overflow-hidden`}
+                  variants={cardHover}
+                  initial="rest"
+                  whileHover="hover"
+                  whileTap={{ scale: 0.95 }}
+                  style={{ transformStyle: "preserve-3d" }}
+                >
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                    initial={{ x: "-100%" }}
+                    whileHover={{ x: "100%" }}
+                    transition={{ duration: 0.6 }}
+                  />
+                  
+                  <motion.div
+                    whileHover={{ 
+                      rotate: 360,
+                      scale: 1.2
+                    }}
+                    transition={{ duration: 0.8 }}
+                    className="relative z-10"
+                  >
+                    <item.icon className={`w-10 h-10 text-${item.color}-600 mx-auto mb-3`} />
+                  </motion.div>
+                  
+                  <motion.h4 
+                    className={`text-2xl font-bold text-${item.color}-900 relative z-10`}
+                    whileHover={{ scale: 1.1 }}
+                  >
+                    {item.value.includes('%') ? (
+                      <><AnimatedCounter end={item.animatedValue} />%</>
+                    ) : item.value.includes('억') ? (
+                      <><AnimatedCounter end={item.animatedValue} />억+</>
+                    ) : (
+                      <><AnimatedCounter end={item.animatedValue} suffix="+" /></>
+                    )}
+                  </motion.h4>
+                  
+                  <p className={`text-${item.color}-700 text-sm relative z-10`}>{item.label}</p>
+                  <p className={`text-xs text-${item.color}-600 mt-1 relative z-10`}>{item.detail}</p>
+                  
+                  {/* Pulse effect */}
+                  <motion.div
+                    className="absolute inset-0 border-2 border-white/50 rounded-xl"
+                    animate={{ 
+                      scale: [1, 1.05, 1],
+                      opacity: [0, 0.5, 0]
+                    }}
+                    transition={{ 
+                      duration: 2, 
+                      repeat: Infinity,
+                      delay: index * 0.5
+                    }}
+                  />
+                </motion.div>
+              ))}
+            </motion.div>
 
-            {/* Growth Projection Chart */}
-            <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-200">
-              <h4 className="text-2xl font-bold text-gray-900 mb-6">매출 성장 전망</h4>
+            {/* Enhanced Growth Projection Chart */}
+            <motion.div 
+              ref={chartRef}
+              className="bg-white p-8 rounded-xl shadow-lg border border-gray-200 relative overflow-hidden"
+              whileHover={{ 
+                scale: 1.02,
+                boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+              }}
+              style={{ transformStyle: "preserve-3d" }}
+            >
+              <motion.div
+                className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-green-500"
+                initial={{ width: 0 }}
+                animate={chartInView ? { width: "100%" } : { width: 0 }}
+                transition={{ duration: 1.5 }}
+              />
+              
+              <motion.h4 
+                className="text-2xl font-bold text-gray-900 mb-6"
+                whileHover={{ scale: 1.05 }}
+              >
+                매출 성장 전망
+              </motion.h4>
               <ResponsiveContainer width="100%" height={400}>
                 <ComposedChart data={growthProjectionData}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -208,7 +452,7 @@ export default function FutureOutlook() {
                   <Line yAxisId="right" type="monotone" dataKey="ebitda_margin" stroke="#10B981" strokeWidth={2} />
                 </ComposedChart>
               </ResponsiveContainer>
-            </div>
+            </motion.div>
           </motion.div>
 
           {/* Strategic Expansion Plans */}

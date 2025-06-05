@@ -1,11 +1,11 @@
 'use client'
 
 import React from 'react'
-import { motion } from 'framer-motion'
+import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
-import { Shield, Zap, Target, AlertTriangle, TrendingUp, Users, Globe, Award, Search, Lightbulb } from 'lucide-react'
+import { Shield, Zap, Target, AlertTriangle, TrendingUp, Users, Globe, Award, Search, Lightbulb, Star, Activity } from 'lucide-react'
 
 const swotData = {
   strengths: {
@@ -74,26 +74,107 @@ const competitiveRadarData = [
   { subject: '혁신능력', lonza: 87, samsung: 75, catalent: 70 }
 ]
 
+function FloatingParticle({ delay }: { delay: number }) {
+  return (
+    <motion.div
+      className="absolute w-2 h-2 bg-blue-400/30 rounded-full"
+      initial={{
+        x: Math.random() * 400,
+        y: Math.random() * 400,
+      }}
+      animate={{
+        x: Math.random() * 400,
+        y: Math.random() * 400,
+        scale: [1, 1.5, 1],
+        opacity: [0.3, 0.8, 0.3],
+      }}
+      transition={{
+        duration: 8 + Math.random() * 4,
+        repeat: Infinity,
+        delay: delay,
+        ease: "easeInOut"
+      }}
+    />
+  )
+}
+
 export default function MarketPosition() {
   const [activeSwot, setActiveSwot] = useState<keyof typeof swotData>('strengths')
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  
   const [ref, inView] = useInView({
     triggerOnce: true,
     threshold: 0.1,
   })
+
+  const [chartRef, chartInView] = useInView({
+    triggerOnce: true,
+    threshold: 0.3,
+  })
+
+  // Mouse tracking for 3D effects
+  const mouseX = useMotionValue(0)
+  const mouseY = useMotionValue(0)
+  
+  const rotateX = useTransform(mouseY, [-300, 300], [5, -5])
+  const rotateY = useTransform(mouseX, [-300, 300], [-5, 5])
+  
+  const springConfig = { damping: 25, stiffness: 400 }
+  const x = useSpring(rotateX, springConfig)
+  const y = useSpring(rotateY, springConfig)
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const { clientX, clientY } = e
+      const { innerWidth, innerHeight } = window
+      const x = clientX - innerWidth / 2
+      const y = clientY - innerHeight / 2
+      
+      setMousePosition({ x, y })
+      mouseX.set(x)
+      mouseY.set(y)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [mouseX, mouseY])
 
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.2,
+        staggerChildren: 0.15,
       },
     },
   }
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 50 },
-    visible: { opacity: 1, y: 0 },
+    hidden: { opacity: 0, y: 50, rotateX: -15 },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      rotateX: 0,
+      transition: {
+        type: "spring",
+        stiffness: 100,
+        damping: 12
+      }
+    },
+  }
+
+  const cardHover = {
+    rest: { scale: 1, rotateY: 0, z: 0 },
+    hover: { 
+      scale: 1.05, 
+      rotateY: 5, 
+      z: 50,
+      transition: {
+        type: "spring",
+        stiffness: 300,
+        damping: 20
+      }
+    }
   }
 
   const swotColors = {
@@ -103,87 +184,197 @@ export default function MarketPosition() {
     red: { bg: 'from-red-50 to-pink-100', border: 'border-red-200', text: 'text-red-600', button: 'bg-red-600' }
   }
 
+  const particles = Array.from({ length: 15 }, (_, i) => i)
+
   return (
-    <section className="py-20 bg-gradient-to-b from-white to-gray-50">
-      <div className="max-w-7xl mx-auto px-4">
+    <section className="py-20 bg-gradient-to-b from-white to-gray-50 relative overflow-hidden">
+      {/* Floating Background Particles */}
+      <div className="absolute inset-0 pointer-events-none">
+        {particles.map((particle) => (
+          <FloatingParticle key={particle} delay={particle * 0.5} />
+        ))}
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 relative z-10">
         <motion.div
           ref={ref}
           variants={containerVariants}
           initial="hidden"
           animate={inView ? "visible" : "hidden"}
+          style={{
+            rotateX: x,
+            rotateY: y,
+            transformStyle: "preserve-3d"
+          }}
         >
           <motion.div variants={itemVariants} className="text-center mb-16">
-            <h2 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+            <motion.h2 
+              className="text-4xl md:text-6xl font-bold text-gray-900 mb-6"
+              whileHover={{ 
+                scale: 1.05,
+                background: "linear-gradient(45deg, #3B82F6, #8B5CF6, #10B981)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent"
+              }}
+            >
               시장 내 포지션 및 전략
-            </h2>
-            <div className="w-24 h-1 bg-gradient-to-r from-blue-600 to-purple-600 mx-auto mb-8"></div>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+            </motion.h2>
+            <motion.div 
+              className="w-24 h-1 bg-gradient-to-r from-blue-600 to-purple-600 mx-auto mb-8"
+              initial={{ width: 0 }}
+              animate={inView ? { width: 96 } : { width: 0 }}
+              transition={{ duration: 1, delay: 0.5 }}
+            />
+            <motion.p 
+              className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed"
+              initial={{ opacity: 0, y: 20 }}
+              animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+              transition={{ delay: 0.8, duration: 0.8 }}
+            >
               론자 그룹의 시장 지위와 경쟁 우위를 SWOT 분석과 R&D 전략을 통해 살펴봅니다.
-            </p>
+            </motion.p>
           </motion.div>
 
+          {/* Enhanced Market Position Stats */}
           <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-20">
-            <div className="text-center p-8 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200">
-              <Award className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-              <h3 className="text-3xl font-bold text-blue-900 mb-2">#1</h3>
-              <p className="text-blue-700">글로벌 CDMO 매출 순위</p>
-            </div>
-            <div className="text-center p-8 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200">
-              <Globe className="w-12 h-12 text-purple-600 mx-auto mb-4" />
-              <h3 className="text-3xl font-bold text-purple-900 mb-2">22%</h3>
-              <p className="text-purple-700">시장 점유율</p>
-            </div>
-            <div className="text-center p-8 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200">
-              <Users className="w-12 h-12 text-green-600 mx-auto mb-4" />
-              <h3 className="text-3xl font-bold text-green-900 mb-2">790+</h3>
-              <p className="text-green-700">고객사 (2022)</p>
-            </div>
-            <div className="text-center p-8 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl border border-orange-200">
-              <TrendingUp className="w-12 h-12 text-orange-600 mx-auto mb-4" />
-              <h3 className="text-3xl font-bold text-orange-900 mb-2">375</h3>
-              <p className="text-orange-700">신규 프로젝트 (2022)</p>
-            </div>
+            {[
+              { icon: Award, title: "#1", subtitle: "글로벌 CDMO 매출 순위", color: "blue" },
+              { icon: Globe, title: "22%", subtitle: "시장 점유율", color: "purple" },
+              { icon: Users, title: "790+", subtitle: "고객사 (2022)", color: "green" },
+              { icon: TrendingUp, title: "375", subtitle: "신규 프로젝트 (2022)", color: "orange" }
+            ].map((stat, index) => (
+              <motion.div
+                key={index}
+                className={`text-center p-8 bg-gradient-to-br from-${stat.color}-50 to-${stat.color}-100 rounded-xl border border-${stat.color}-200 cursor-pointer relative overflow-hidden`}
+                variants={cardHover}
+                initial="rest"
+                whileHover="hover"
+                whileTap={{ scale: 0.95 }}
+                style={{ transformStyle: "preserve-3d" }}
+              >
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                  initial={{ x: "-100%" }}
+                  whileHover={{ x: "100%" }}
+                  transition={{ duration: 0.6 }}
+                />
+                
+                <motion.div
+                  className="relative z-10"
+                  whileHover={{ 
+                    rotateY: 360,
+                    scale: 1.2
+                  }}
+                  transition={{ duration: 0.8 }}
+                >
+                  <stat.icon className={`w-12 h-12 text-${stat.color}-600 mx-auto mb-4`} />
+                </motion.div>
+                
+                <motion.h3 
+                  className={`text-3xl font-bold text-${stat.color}-900 mb-2 relative z-10`}
+                  whileHover={{ scale: 1.1 }}
+                >
+                  {stat.title}
+                </motion.h3>
+                <p className={`text-${stat.color}-700 relative z-10`}>{stat.subtitle}</p>
+                
+                {/* Decorative elements */}
+                <motion.div
+                  className="absolute top-2 right-2"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                >
+                  <Star className={`w-4 h-4 text-${stat.color}-400/50`} />
+                </motion.div>
+              </motion.div>
+            ))}
           </motion.div>
 
+          {/* Enhanced SWOT Analysis */}
           <motion.div variants={itemVariants} className="mb-20">
-            <h3 className="text-3xl font-bold text-gray-900 mb-12 text-center">SWOT 분석</h3>
+            <motion.h3 
+              className="text-3xl font-bold text-gray-900 mb-12 text-center"
+              whileHover={{ scale: 1.05 }}
+            >
+              SWOT 분석
+            </motion.h3>
             
-            <div className="flex flex-wrap justify-center gap-4 mb-8">
-              {Object.entries(swotData).map(([key, data]) => {
+            <motion.div 
+              className="flex flex-wrap justify-center gap-4 mb-8"
+              variants={containerVariants}
+            >
+              {Object.entries(swotData).map(([key, data], index) => {
                 const IconComponent = data.icon
                 const isActive = activeSwot === key
                 return (
-                  <button
+                  <motion.button
                     key={key}
                     onClick={() => setActiveSwot(key as keyof typeof swotData)}
-                    className={`flex items-center px-6 py-4 rounded-lg font-semibold transition-all duration-300 ${
+                    className={`flex items-center px-6 py-4 rounded-lg font-semibold transition-all duration-300 relative overflow-hidden ${
                       isActive
                         ? `${swotColors[data.color as keyof typeof swotColors].button} text-white shadow-lg scale-105`
                         : 'bg-white text-gray-600 hover:bg-gray-50 shadow-md'
                     }`}
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.95 }}
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
                   >
-                    <IconComponent className="w-5 h-5 mr-2" />
+                    <motion.div
+                      whileHover={{ rotate: 360 }}
+                      transition={{ duration: 0.5 }}
+                    >
+                      <IconComponent className="w-5 h-5 mr-2" />
+                    </motion.div>
                     {data.title}
-                  </button>
+                    
+                    {isActive && (
+                      <motion.div
+                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                        initial={{ x: "-100%" }}
+                        animate={{ x: "100%" }}
+                        transition={{ duration: 0.8, repeat: Infinity }}
+                      />
+                    )}
+                  </motion.button>
                 )
               })}
-            </div>
+            </motion.div>
 
             <motion.div
               key={activeSwot}
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5 }}
-              className={`bg-gradient-to-br ${swotColors[swotData[activeSwot].color as keyof typeof swotColors].bg} p-8 rounded-2xl border ${swotColors[swotData[activeSwot].color as keyof typeof swotColors].border}`}
+              initial={{ opacity: 0, x: 50, rotateY: 15 }}
+              animate={{ opacity: 1, x: 0, rotateY: 0 }}
+              transition={{ duration: 0.6, type: "spring" }}
+              className={`bg-gradient-to-br ${swotColors[swotData[activeSwot].color as keyof typeof swotColors].bg} p-8 rounded-2xl border ${swotColors[swotData[activeSwot].color as keyof typeof swotColors].border} relative overflow-hidden`}
+              whileHover={{ scale: 1.02 }}
             >
+              <motion.div
+                className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"
+                initial={{ width: 0 }}
+                animate={{ width: "100%" }}
+                transition={{ duration: 1 }}
+              />
+              
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
                 <div>
-                  <div className="flex items-center mb-6">
-                    {React.createElement(swotData[activeSwot].icon, { 
-                      className: `w-12 h-12 ${swotColors[swotData[activeSwot].color as keyof typeof swotColors].text} mr-4` 
-                    })}
+                  <motion.div 
+                    className="flex items-center mb-6"
+                    initial={{ opacity: 0, x: -30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <motion.div
+                      whileHover={{ scale: 1.2, rotate: 10 }}
+                      transition={{ type: "spring", stiffness: 300 }}
+                    >
+                      {React.createElement(swotData[activeSwot].icon, { 
+                        className: `w-12 h-12 ${swotColors[swotData[activeSwot].color as keyof typeof swotColors].text} mr-4` 
+                      })}
+                    </motion.div>
                     <h4 className="text-3xl font-bold text-gray-900">{swotData[activeSwot].title}</h4>
-                  </div>
+                  </motion.div>
                   
                   <div className="space-y-4">
                     {swotData[activeSwot].items.map((item, index) => (
@@ -191,118 +382,250 @@ export default function MarketPosition() {
                         key={index}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className="flex items-start"
+                        transition={{ delay: 0.3 + index * 0.1 }}
+                        className="flex items-start group"
+                        whileHover={{ x: 5 }}
                       >
-                        <div className={`w-2 h-2 ${swotColors[swotData[activeSwot].color as keyof typeof swotColors].button} rounded-full mt-3 mr-4 flex-shrink-0`}></div>
-                        <p className="text-gray-700 leading-relaxed">{item}</p>
+                        <motion.div 
+                          className={`w-2 h-2 ${swotColors[swotData[activeSwot].color as keyof typeof swotColors].button} rounded-full mt-3 mr-4 flex-shrink-0`}
+                          whileHover={{ scale: 1.5 }}
+                        />
+                        <p className="text-gray-700 leading-relaxed group-hover:text-gray-900 transition-colors">{item}</p>
                       </motion.div>
                     ))}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  {Object.entries(swotData).map(([key, data]) => {
+                <motion.div 
+                  className="grid grid-cols-2 gap-4"
+                  variants={containerVariants}
+                >
+                  {Object.entries(swotData).map(([key, data], index) => {
                     const IconComponent = data.icon
                     const isCurrentActive = key === activeSwot
                     return (
-                      <div
+                      <motion.div
                         key={key}
-                        className={`p-6 rounded-xl border-2 transition-all duration-300 ${
+                        className={`p-6 rounded-xl border-2 transition-all duration-300 cursor-pointer ${
                           isCurrentActive
                             ? `${swotColors[data.color as keyof typeof swotColors].border} bg-white/80 scale-105`
-                            : 'border-gray-200 bg-white/50'
+                            : 'border-gray-200 bg-white/50 hover:bg-white/80'
                         }`}
+                        whileHover={{ 
+                          scale: isCurrentActive ? 1.1 : 1.05,
+                          rotateY: 5
+                        }}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.4 + index * 0.1, type: "spring" }}
+                        onClick={() => setActiveSwot(key as keyof typeof swotData)}
                       >
-                        <IconComponent className={`w-8 h-8 ${swotColors[data.color as keyof typeof swotColors].text} mb-3`} />
+                        <motion.div
+                          whileHover={{ rotate: 360 }}
+                          transition={{ duration: 0.6 }}
+                        >
+                          <IconComponent className={`w-8 h-8 ${swotColors[data.color as keyof typeof swotColors].text} mb-3`} />
+                        </motion.div>
                         <h5 className="font-semibold text-gray-900 text-sm">{data.title}</h5>
                         <p className="text-xs text-gray-600 mt-1">{data.items.length}개 요소</p>
-                      </div>
+                      </motion.div>
                     )
                   })}
-                </div>
+                </motion.div>
               </div>
             </motion.div>
           </motion.div>
 
-          <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
-            <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-200">
-              <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                <Search className="w-6 h-6 mr-2 text-blue-600" />
+          {/* Enhanced Charts Section */}
+          <motion.div 
+            ref={chartRef}
+            variants={itemVariants} 
+            className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16"
+          >
+            <motion.div 
+              className="bg-white p-8 rounded-xl shadow-lg border border-gray-200 relative overflow-hidden"
+              whileHover={{ 
+                scale: 1.02,
+                boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+              }}
+              style={{ transformStyle: "preserve-3d" }}
+            >
+              <motion.div
+                className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"
+                initial={{ width: 0 }}
+                animate={chartInView ? { width: "100%" } : { width: 0 }}
+                transition={{ duration: 1 }}
+              />
+              
+              <motion.h3 
+                className="text-2xl font-bold text-gray-900 mb-6 flex items-center"
+                whileHover={{ scale: 1.05 }}
+              >
+                <motion.div
+                  whileHover={{ rotate: 360 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <Search className="w-6 h-6 mr-2 text-blue-600" />
+                </motion.div>
                 R&D 투자 현황
-              </h3>
+              </motion.h3>
+              
               <ResponsiveContainer width="100%" height={300}>
                 <AreaChart data={rdInvestmentData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="year" />
-                  <YAxis />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
+                  <XAxis dataKey="year" stroke="#6b7280" />
+                  <YAxis stroke="#6b7280" />
                   <Tooltip 
                     formatter={(value, name) => [
                       `${value}%`,
                       name === 'rd' ? 'R&D 투자율' : 'CAPEX 투자율'
                     ]}
+                    contentStyle={{
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+                    }}
                   />
                   <Area type="monotone" dataKey="rd" stackId="1" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.6} />
                   <Area type="monotone" dataKey="capex" stackId="1" stroke="#8B5CF6" fill="#8B5CF6" fillOpacity={0.6} />
                 </AreaChart>
               </ResponsiveContainer>
-              <div className="mt-4 text-sm text-gray-600">
+              
+              <motion.div 
+                className="mt-4 text-sm text-gray-600"
+                initial={{ opacity: 0 }}
+                animate={chartInView ? { opacity: 1 } : { opacity: 0 }}
+                transition={{ delay: 1 }}
+              >
                 <p>• R&D: 매출 대비 5-7% 지속 투자</p>
                 <p>• CAPEX: 매출 대비 25-30% 공격적 투자</p>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
 
-            <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-200">
-              <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                <Target className="w-6 h-6 mr-2 text-purple-600" />
-                경쟁력 비교 분석
-              </h3>
+            <motion.div 
+              className="bg-white p-8 rounded-xl shadow-lg border border-gray-200 relative overflow-hidden"
+              whileHover={{ 
+                scale: 1.02,
+                boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+              }}
+              style={{ transformStyle: "preserve-3d" }}
+            >
+              <motion.div
+                className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 to-blue-500"
+                initial={{ width: 0 }}
+                animate={chartInView ? { width: "100%" } : { width: 0 }}
+                transition={{ duration: 1, delay: 0.2 }}
+              />
+              
+              <motion.h3 
+                className="text-2xl font-bold text-gray-900 mb-6 flex items-center"
+                whileHover={{ scale: 1.05 }}
+              >
+                <motion.div
+                  whileHover={{ rotate: 360 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <Activity className="w-6 h-6 mr-2 text-green-600" />
+                </motion.div>
+                경쟁사 비교 분석
+              </motion.h3>
+              
               <ResponsiveContainer width="100%" height={300}>
                 <RadarChart data={competitiveRadarData}>
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="subject" />
-                  <PolarRadiusAxis angle={90} domain={[0, 100]} />
-                  <Radar name="Lonza" dataKey="lonza" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.3} />
-                  <Radar name="Samsung" dataKey="samsung" stroke="#10B981" fill="#10B981" fillOpacity={0.2} />
-                  <Radar name="Catalent" dataKey="catalent" stroke="#F59E0B" fill="#F59E0B" fillOpacity={0.2} />
-                  <Tooltip />
+                  <PolarGrid stroke="#e0e7ff" />
+                  <PolarAngleAxis dataKey="subject" className="text-sm" />
+                  <PolarRadiusAxis angle={90} domain={[0, 100]} className="text-xs" />
+                  <Radar name="Lonza" dataKey="lonza" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.3} strokeWidth={2} />
+                  <Radar name="Samsung" dataKey="samsung" stroke="#8B5CF6" fill="#8B5CF6" fillOpacity={0.2} strokeWidth={2} />
+                  <Radar name="Catalent" dataKey="catalent" stroke="#10B981" fill="#10B981" fillOpacity={0.2} strokeWidth={2} />
                 </RadarChart>
               </ResponsiveContainer>
-            </div>
+              
+              <motion.div 
+                className="mt-4 flex justify-center space-x-6 text-sm"
+                initial={{ opacity: 0 }}
+                animate={chartInView ? { opacity: 1 } : { opacity: 0 }}
+                transition={{ delay: 1.2 }}
+              >
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                  <span>Lonza</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
+                  <span>Samsung</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                  <span>Catalent</span>
+                </div>
+              </motion.div>
+            </motion.div>
           </motion.div>
 
-          <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-8 rounded-xl border border-blue-200">
-              <Lightbulb className="w-12 h-12 text-blue-600 mb-4" />
-              <h4 className="text-xl font-bold text-gray-900 mb-4">R&D 전략</h4>
-              <ul className="text-gray-700 space-y-2 text-sm">
-                <li>• 공정혁신과 플랫폼 기술 확보에 집중</li>
-                <li>• Cocoon® 자동화 플랫폼 개발</li>
-                <li>• AI 기반 공정최적화 도입</li>
-                <li>• 차세대 세포주 개발 기술</li>
-              </ul>
-            </div>
-
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-8 rounded-xl border border-purple-200">
-              <Users className="w-12 h-12 text-purple-600 mb-4" />
-              <h4 className="text-xl font-bold text-gray-900 mb-4">기술 제휴</h4>
-              <ul className="text-gray-700 space-y-2 text-sm">
-                <li>• Vertex와 세포치료제 전용시설 공동투자</li>
-                <li>• Synaffix 인수로 ADC 기술 강화</li>
-                <li>• ABL Bio와 이중항체 개발 협력</li>
-                <li>• 개방형 혁신(Open Innovation) 추진</li>
-              </ul>
-            </div>
-
-            <div className="bg-gradient-to-br from-green-50 to-green-100 p-8 rounded-xl border border-green-200">
-              <TrendingUp className="w-12 h-12 text-green-600 mb-4" />
-              <h4 className="text-xl font-bold text-gray-900 mb-4">성장 전망</h4>
-              <ul className="text-gray-700 space-y-2 text-sm">
-                <li>• 2024-2028 매출 CAGR 11-13% 목표</li>
-                <li>• CORE EBITDA 마진 32-34% 유지</li>
-                <li>• 핵심사업 집중으로 효율성 제고</li>
-                <li>• 선제적 생산능력 확장 지속</li>
-              </ul>
+          {/* Strategic Insights */}
+          <motion.div 
+            variants={itemVariants}
+            className="bg-gradient-to-r from-indigo-50 to-purple-50 p-8 rounded-2xl border border-indigo-200 relative overflow-hidden"
+            whileHover={{ scale: 1.01 }}
+          >
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-indigo-100/50 to-purple-100/50"
+              initial={{ x: "-100%" }}
+              whileHover={{ x: "100%" }}
+              transition={{ duration: 1 }}
+            />
+            
+            <motion.h3 
+              className="text-2xl font-bold text-gray-900 mb-6 flex items-center relative z-10"
+              whileHover={{ scale: 1.05 }}
+            >
+              <motion.div
+                whileHover={{ rotate: 360 }}
+                transition={{ duration: 0.5 }}
+              >
+                <Lightbulb className="w-6 h-6 mr-2 text-indigo-600" />
+              </motion.div>
+              전략적 인사이트
+            </motion.h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+              {[
+                {
+                  title: "시장 리더십",
+                  content: "글로벌 CDMO 시장에서 1위 지위를 유지하며 22%의 시장 점유율 확보",
+                  icon: Award
+                },
+                {
+                  title: "기술 혁신",
+                  content: "R&D 투자 지속 확대로 차세대 바이오의약품 생산 기술 선도",
+                  icon: Lightbulb
+                },
+                {
+                  title: "성장 동력",
+                  content: "아웃소싱 시장 확대와 바이오의약품 수요 증가로 지속 성장 기반 확보",
+                  icon: TrendingUp
+                }
+              ].map((insight, index) => (
+                <motion.div
+                  key={index}
+                  className="text-center"
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
+                  transition={{ delay: 1 + index * 0.2 }}
+                  whileHover={{ scale: 1.05, y: -5 }}
+                >
+                  <motion.div
+                    whileHover={{ rotate: 360, scale: 1.2 }}
+                    transition={{ duration: 0.6 }}
+                  >
+                    <insight.icon className="w-8 h-8 text-indigo-600 mx-auto mb-4" />
+                  </motion.div>
+                  <h4 className="font-semibold text-gray-900 mb-2">{insight.title}</h4>
+                  <p className="text-gray-600 text-sm leading-relaxed">{insight.content}</p>
+                </motion.div>
+              ))}
             </div>
           </motion.div>
         </motion.div>
