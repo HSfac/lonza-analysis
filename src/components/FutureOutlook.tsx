@@ -196,10 +196,10 @@ export default function FutureOutlook() {
                   <XAxis dataKey="year" />
                   <YAxis yAxisId="left" />
                   <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip 
+                                    <Tooltip 
                     formatter={(value, name) => [
-                      name.includes('margin') ? `${value}%` : `${value} billion CHF`,
-                      name === 'revenue' ? '실제 매출' : 
+                      typeof name === 'string' && name.includes('margin') ? `${value}%` : `${value} billion CHF`,
+                      name === 'revenue' ? '실제 매출' :
                       name === 'projected_revenue' ? '목표 매출' : 'EBITDA 마진'
                     ]}
                   />
