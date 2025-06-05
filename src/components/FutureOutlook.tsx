@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
 import { useState } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Bar, Area, PieChart, Pie, Cell } from 'recharts'
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Bar, PieChart, Pie, Cell } from 'recharts'
 import { Rocket, Target, AlertCircle, TrendingUp, Building, Globe2, DollarSign, Users, Zap, Shield } from 'lucide-react'
 
 const growthProjectionData = [

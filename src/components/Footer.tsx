@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
-import { Building2, Mail, Globe, MapPin, Phone, Calendar } from 'lucide-react'
+import { Building2, Globe, MapPin, Phone, Calendar } from 'lucide-react'
 
 export default function Footer() {
   const [ref, inView] = useInView({
